@@ -1,60 +1,203 @@
-# Biblioteca en Solana
+# 🩸 BloodBank Solana - Explicación del Código
 
-![banner](./images/banner-biblioteca.jpg)
+Este programa está desarrollado en **Rust** utilizando el framework **Anchor** sobre la blockchain de **Solana**. Su objetivo es gestionar un banco de sangre hospitalario mediante operaciones **CRUD** (Crear, Leer, Actualizar y Eliminar), asegurando trazabilidad y control de unidades sanguíneas.
 
-CRUD básico de un Solana Program desarrollado con Rust y Anchor desde el Solana Playground. 
+---
 
-Puedes comenzar dándole Fork a este repositorio (abajo te explicamos como 👇), **hemos preparado un entorno de codespaces listo para que no tengas que instalar nada**, solo déjate llevar por la fluidez de los ejercicios y temas desarrollados especialmente para ti. 
+## 🔑 1. Configuración Inicial
 
-Asegúrate de clonar este repositorio a tu cuenta usando el botón **`Fork`**.
+use anchor_lang::prelude::*;
 
-![fork](./images/fork.png)
+// ID del programa (Se genera al hacer build en SolPG)
+declare_id!("EcYLociRgSb8JkLra9fKM1p4iD8uLNmsrjATB37TuvcD");
 
-## Importando el proyecto 
+* Se importa la librería principal de Anchor.
+* `declare_id!` define la dirección única del programa dentro de la red de Solana.
 
-Ya con el repositorio en tu cuenta lo siguiente que debes hacer copiar el `enlace de tu repositorio`, lo que se puede hacer directamente desdel navegador:
+---
 
-![repo](./images/repo.png)
-Posteriormente, lo uniremos con el siguiente enlace en nuestro navegador de preferencia:
+## ⚙️ 2. Módulo del Programa
 
-```url
-https://beta.solpg.io/
-```
+#[program]
+pub mod bloodbank_solana {
 
-Lo que nos dará algo parecido a:
+Aquí se definen todas las funciones públicas del smart contract.
 
-![url](./images/url.png)
+---
 
-Al pulsar enter seremos enviados al `Solana Playground` con nuestro proyecto abierto:
+## 🟢 3. Operaciones CRUD
 
-![pg](./images/pg.png)
+### 3.1 CREATE - Inicializar Banco de Sangre
 
-Para guardarlo solo damos clic en el boton `import` y asignamos un nombre:
+pub fn inicializar_banco(ctx: Context<CrearBanco>, nombre_hospital: String) -> Result<()>
 
-![import](./images/import.png)
+* Crea una cuenta en la blockchain que representa el banco de sangre.
+* Guarda:
 
-## Preparacion del entorno
+  * El propietario (`owner`)
+  * Nombre del hospital
+  * Inventario vacío
 
-Primero conectaremos el entorno con la devnet, lo que tambien procederá a la creación de una wallet. Para eso daremos clic en donde dice **Not Conected**:
+👉 Utiliza un **PDA (Program Derived Address)** para generar una dirección única del banco.
 
-![playground1](./images/playground1.png)
+---
 
-Saldrá la siguiente ventana donde daremos en el botón **Continue**:
+### 3.2 CREATE - Registrar Unidad de Sangre
 
-![wallet](./images/wallet.png)
+pub fn registrar_unidad(...)
 
-Como resultado se mostrará la siguiente información:
+* Registra una nueva donación de sangre.
+* Valida que el usuario sea el propietario autorizado:
 
-![status](./images/status.png)
+require!(banco.owner == ctx.accounts.owner.key(), Errores::NoEresElOwner);
 
-* En verde: el estado de la conexión y el entorno al que se encuentra conectado
+* Guarda:
 
-* En amarillo: la la dirección de la wallet conectada
+  * Código del donante
+  * Grupo sanguíneo
+  * Volumen en mililitros
+  * Días de caducidad
 
-* En azul: la cantidad de tokens en la wallet
+👉 Permite mantener control clínico detallado de cada unidad.
 
-> ℹ️ ¿Quieres ver el ejemplo de un "Hola Mundo" en Solana?. Da clic aquí: 👉 [Ver Ejemplo](https://github.com/WayLearnLatam/Solana-starter-kit/tree/1fc6349ba63375a3fe223d8d56911bc64765459b/build-deploy)
+---
 
-> ℹ️ ¿Cuentas con una Wallet de [Phantom](https://phantom.com/) que deseas importar?, Da clic aquí para ver como hacerlo: 
+### 3.3 UPDATE - Editar Unidad
 
-👉 [Como Importar una Wallet](https://github.com/WayLearnLatam/Solana-starter-kit/tree/1fc6349ba63375a3fe223d8d56911bc64765459b/import-key-a-playground)
+pub fn editar_unidad(...)
+
+* Busca una unidad por el **código del donante**.
+* Si la encuentra:
+
+  * Actualiza grupo sanguíneo, volumen y caducidad.
+* Si no:
+
+  * Retorna error `UnidadNoEncontrada`.
+
+👉 Útil en escenarios médicos donde la unidad cambia (ej. separación de componentes).
+
+---
+
+### 3.4 DELETE - Eliminar Unidad
+
+pub fn eliminar_unidad(...)
+
+* Busca la unidad dentro del inventario.
+* Si existe:
+
+  * Se elimina (por transfusión o descarte).
+* Si no:
+
+  * Retorna error.
+
+---
+
+### 3.5 READ - Ver Inventario
+
+pub fn ver_inventario(...)
+
+* Muestra en consola:
+
+  * Nombre del hospital
+  * Inventario de unidades disponibles
+
+👉 Enfocado en monitorear el estado crítico del banco de sangre.
+
+---
+
+## 📦 4. Estructuras de Datos
+
+### 🧬 UnidadSangre
+
+pub struct UnidadSangre {
+pub codigo_donante: String,
+pub grupo_sanguineo: String,
+pub volumen_ml: u16,
+pub dias_caducidad: u8,
+}
+
+Representa una unidad de sangre almacenada.
+
+📌 Restricciones:
+
+* `codigo_donante`: máximo 20 caracteres
+* `grupo_sanguineo`: máximo 15 caracteres
+
+---
+
+### 🏥 BancoSangre
+
+pub struct BancoSangre {
+pub owner: Pubkey,
+pub nombre_hospital: String,
+pub inventario: Vec<UnidadSangre>,
+}
+
+* Es la cuenta principal almacenada en la blockchain.
+* Contiene:
+
+  * Propietario (hospital o administrador)
+  * Nombre del hospital
+  * Inventario de unidades
+
+📌 Límite:
+
+* Máximo 15 unidades críticas almacenadas
+
+---
+
+## 🔐 5. Contextos (Accounts)
+
+### CrearBanco
+
+#[derive(Accounts)]
+pub struct CrearBanco<'info>
+
+* Define las cuentas necesarias para inicializar el banco:
+
+  * `owner`: firmante y pagador
+  * `banco`: cuenta que se crea
+  * `system_program`: requerido por Solana
+
+📌 Usa:
+
+* `seeds` → generación de PDA
+* `bump` → evitar colisiones
+
+---
+
+### GestionarBanco
+
+#[derive(Accounts)]
+pub struct GestionarBanco<'info>
+
+* Se utiliza para todas las operaciones CRUD.
+* Requiere:
+
+  * `owner` (firmante)
+  * `banco` (cuenta mutable)
+
+---
+
+## ⚠️ 6. Manejo de Errores
+
+#[error_code]
+pub enum Errores {
+
+Define errores personalizados:
+
+* `NoEresElOwner` → acceso no autorizado
+* `UnidadNoEncontrada` → no existe el registro del donante
+
+---
+
+## 🧠 Conclusión
+
+Este programa implementa un sistema de gestión de banco de sangre en blockchain, destacando:
+
+* 🔑 Control de acceso mediante claves criptográficas (`owner`)
+* 🩸 Registro detallado de unidades sanguíneas
+* ⚡ Uso de PDAs para direcciones únicas y seguras
+* 🔄 Operaciones CRUD sobre inventario médico
+
+Representa un caso práctico de cómo aplicar blockchain en el sector salud, garantizando **trazabilidad, integridad y seguridad** en la gestión de recursos críticos como la sangre.
